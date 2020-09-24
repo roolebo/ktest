@@ -80,7 +80,7 @@ logq() {
 usage() {
     cat << EOF
 
-Usage: $0 [options] <kernel>
+Usage: $0 [options] <kernel> [config]
 
 ctrl+] can be used to stop the VM
 
@@ -254,13 +254,17 @@ parse_options(){
             shift
         fi
     done
-    if [ ${#POSITIONAL[@]} -ne 1 ]; then
+    if [ ${#POSITIONAL[@]} -lt 1 -o ${#POSITIONAL[@]} -gt 2 ]; then
         usage
         exit 1
     fi
 
     KERNEL="${POSITIONAL[0]}"
+    CONFIG="${POSITIONAL[1]}"
     [ -r "$KERNEL" ] || die "Can't read kernel: $KERNEL"
+    if [ -n "$CONFIG" ]; then
+        [ -r "$CONFIG" ] || die "Can't read kernel config: $CONFIG"
+    fi
     [ -n "$ENTRY_POINT" ] && KOPT+=("ktest.start=$ENTRY_POINT")
     [ -z "$DISABLE_CONSOLE" ] && CONSOLE="--console"
     [[ $VM_TIMEOUT =~ ^[0-9]+$ ]] || die "Invalid timeout: $VM_TIMEOUT"
@@ -633,7 +637,7 @@ mkdir -p "$USR_CACHE_DIR/$VMNAME"
 VOLUMES+=("$KERNEL_VOLUME:$KERNEL:raw:")
 
 INITRAMFS="$USR_CACHE_DIR/$VMNAME/initrd"
-run_mkinitrd ${MKINITRD_ARGS[@]} "$INITRAMFS" "$KERNEL"
+run_mkinitrd ${MKINITRD_ARGS[@]} "$INITRAMFS" "$KERNEL" "$CONFIG"
 VOLUMES+=("$INITRAMFS_VOLUME:$INITRAMFS:raw:")
 
 CRASHDRIVE="$USR_CACHE_DIR/$VMNAME/crash.qcow2"

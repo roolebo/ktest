@@ -31,7 +31,7 @@ targetdeps="$sysunitdir/multi-user.target.wants"
 
 usage() {
     cat <<EOF
-Usage: $0 [options] <out-file> <kernel-image>
+Usage: $0 [options] <out-file> <kernel-image> [kernel-config]
 
 Options:
   -k, --with-kdump         Build kdump kernel
@@ -89,12 +89,13 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-if [ ${#POSITIONAL[@]} -ne 2 ]; then
+if [ ${#POSITIONAL[@]} -lt 2 -o ${#POSITIONAL[@]} -gt 3 ]; then
     usage
     exit 1
 fi
 OUT="${POSITIONAL[0]}"
 KIMG="${POSITIONAL[1]}"
+CONFIG="${POSITIONAL[2]}"
 [ -r "$KIMG" ] || die "Can't read kernel: $KIMG"
 KVER=$(strings "$KIMG" | grep -oP 'Linux version \K\S+') || :
 [ -z "$KVER" ] && KVER=$(file "$KIMG" | grep -oP ', Version \K\S+') || :
