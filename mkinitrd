@@ -21,7 +21,15 @@ declare -a DRACUT_OPTS
 declare -a KMODS
 CURDIR=$(dirname $(realpath "${BASH_SOURCE[0]}"))
 GUEST="$CURDIR/guest"
-KMODS+=(virtio_pci virtio_net virtio_blk virtio_scsi virtio_console virtio-rng sg sd_mod)
+KTEST_KMODS=(CONFIG_VIRTIO_PCI:virtio_pci
+             CONFIG_VIRTIO_NET:virtio_net
+             CONFIG_VIRTIO_BLK:virtio_blk
+             CONFIG_SCSI_VIRTIO:virtio_scsi
+             CONFIG_VIRTIO_CONSOLE:virtio_console
+             CONFIG_CRYPTO_DEV_VIRTIO:virtio_rng
+             CONFIG_CHR_DEV_SG:sg
+             CONFIG_BLK_DEV_SD:sd)
+
 MODULES=(base systemd terminfo)
 INSTALL=(zcat zless zgrep grep gzip cut sed awk tr ps tar nproc)
 source "$CURDIR/lib"
@@ -95,11 +103,14 @@ if [ ${#POSITIONAL[@]} -lt 2 -o ${#POSITIONAL[@]} -gt 3 ]; then
 fi
 OUT="${POSITIONAL[0]}"
 KIMG="${POSITIONAL[1]}"
-CONFIG="${POSITIONAL[2]}"
+KCONFIG="${POSITIONAL[2]}"
 [ -r "$KIMG" ] || die "Can't read kernel: $KIMG"
 KVER=$(strings "$KIMG" | grep -oP 'Linux version \K\S+') || :
 [ -z "$KVER" ] && KVER=$(file "$KIMG" | grep -oP ', Version \K\S+') || :
 [ -n "$KVER" ] || die "Can't extract kernel version from: $KIMG"
+if [ -n "$KCONFIG" ]; then
+    [ -r "$KCONFIG" ] || die "Can't read kernel config: $KCONFIG"
+fi
 emptydir=$(mktemp -d)
 ktestdir=$(mktemp -d)
 entrypoint="$GUEST/profile"
@@ -140,6 +151,28 @@ inst_libdir_file() {
         done
     done
 }
+
+if [ -n "$KCONFIG" ]; then
+    source "$KCONFIG"
+    for conf_mod in "${KTEST_KMODS[@]}"; do
+        conf=$(cut -d: -f1 <<< "$conf_mod")
+        mod=$(cut -d: -f2 <<< "$conf_mod")
+        case "${!conf}" in
+        "m")
+            KMODS+=($mod)
+            ;;
+        "y")
+            # The module is part of the kernel, do nothing
+            ;;
+        *)
+            die "ktest needs $mod but $conf is \"${!conf}\""
+        esac
+    done
+else
+    for conf_mod in "${KTEST_KMODS[@]}"; do
+        KMODS+=($(cut -d: -f2 <<< "$conf_mod"))
+    done
+fi
 
 if [ -n "$NETWORK" ]; then
     NET_INSTALL=(ip dhclient arping ping ping6 hostname)
